@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShoeSwap - shoe size converter from the barleycorn up</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; background:#231a14; color:#f5ece5; line-height:1.5; }
+  .wrap { max-width:640px; margin:0 auto; padding:26px 18px 50px; }
+  h1 { font-size:28px; } h1 span { color:#ff9f5a; }
+  .sub { color:#c4b0a2; margin:6px 0 18px; }
+  .card { background:#31241b; border-radius:14px; padding:16px; margin-bottom:14px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; } label { display:block; font-size:13px; color:#c4b0a2; margin-bottom:4px; }
+  input, select { background:#231a14; color:#f5ece5; border:1px solid #5a4536; border-radius:8px; padding:9px; font-size:16px; } input { width:110px; }
+  button { background:#41301f; color:#f5ece5; border:0; padding:9px 14px; border-radius:8px; cursor:pointer; font-size:14px; } button.on { background:#ff9f5a; color:#231a14; font-weight:700; }
+  .grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; } .grid div { background:#231a14; border-radius:10px; padding:10px 12px; } .grid span { font-size:13px; color:#c4b0a2; display:block; } .grid b { font-size:26px; color:#ff9f5a; }
+  .muted { color:#c4b0a2; font-size:14px; } .note { font-size:12.5px; color:#977f6f; }
+  svg { width:100%; height:auto; display:block; margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Shoe<span>Swap</span></h1>
+  <div class="sub">Convert between US, UK and EU adult shoe sizes using the real maths behind them: barleycorns and Paris points.</div>
+  <div class="card">
+    <div><button id="mSize" class="on">I know a size</button> <button id="mFoot">I know my foot length</button></div>
+    <div class="row" id="rSize" style="margin-top:12px"><div><label>System</label><select id="sys"></select></div><div><label>Size</label><input id="size" type="number" step="0.5" value="9"></div></div>
+    <div class="row" id="rFoot" style="margin-top:12px;display:none"><div><label>Foot length (cm)</label><input id="cm" type="number" step="0.1" value="26.2"></div></div>
+  </div>
+  <div class="card"><div class="grid" id="grid"></div><div class="muted" id="foot" style="margin-top:10px"></div>
+    <svg id="ruler" viewBox="0 0 600 50" role="img" aria-label="Foot length on a ruler"></svg></div>
+  <div class="note">US and UK sizes count barleycorns (1/3 inch); EU counts Paris points (2/3 cm) on the last, which runs about 2 cm longer than the foot. Formulas: US men = 3 x foot inches - 22, US women = 3 x foot inches - 21, UK = 3 x foot inches - 23 (Wikipedia, Shoe size). Brands differ by up to a full size, so use this as a guide and check the brand chart. Adult sizes only. Mondopoint is the foot length in mm rounded up to 5.</div>
+</div>
+<script src="engine.js"></script>
+<script>
+(function () {
+  var S = window.Shoe, mode = 'size', $ = function (i) { return document.getElementById(i); };
+  $('sys').innerHTML = S.SYSTEMS.map(function (s) { return '<option value="' + s.id + '">' + s.name + '</option>'; }).join('');
+  function render() {
+    var c;
+    if (mode === 'size') { var v = parseFloat($('size').value); if (!(v > 0)) return bad(); c = S.convert($('sys').value, v); }
+    else { var cm = parseFloat($('cm').value); if (!(cm > 0)) return bad(); var cs = { cm: cm, inches: cm / S.CM_PER_IN, mondo: Math.ceil(cm * 2 - 1e-9) * 5 }; S.SYSTEMS.forEach(function (s) { cs[s.id] = S.sizeFromCm(s.id, cm); }); c = cs; }
+    if (c.cm < 8 || c.cm > 40) return bad('Outside the adult size range');
+    $('grid').innerHTML = S.SYSTEMS.map(function (s) { return '<div><span>' + s.name + '</span><b>' + S.label(s.id, c[s.id]) + '</b></div>'; }).join('') + '<div><span>Mondopoint</span><b>' + c.mondo + '</b></div><div><span>Foot length</span><b>' + (Math.round(c.cm * 10) / 10) + ' cm</b></div>';
+    $('foot').textContent = 'Foot length about ' + (Math.round(c.cm * 10) / 10) + ' cm (' + (Math.round(c.inches * 100) / 100) + ' in). Exact sizes before rounding: US men ' + c.usm.toFixed(1) + ', UK ' + c.uk.toFixed(1) + ', EU ' + c.eu.toFixed(1) + '.';
+    var x = 20 + (Math.min(32, Math.max(20, c.cm)) - 20) / 12 * 560, t = '';
+    for (var k = 20; k <= 32; k++) { var px = 20 + (k - 20) / 12 * 560; t += '<line x1="' + px + '" x2="' + px + '" y1="20" y2="32" stroke="#5a4536"/><text x="' + (px - 6) + '" y="46" fill="#977f6f" font-size="11">' + k + '</text>'; }
+    $('ruler').innerHTML = '<line x1="20" x2="580" y1="26" y2="26" stroke="#5a4536"/>' + t + '<rect x="' + (x - 3) + '" y="8" width="6" height="36" rx="3" fill="#ff9f5a"/>';
+  }
+  function bad(msg) { $('grid').innerHTML = '<div style="grid-column:1/3">' + (msg || 'Enter a size or foot length') + '</div>'; $('foot').textContent = ''; $('ruler').innerHTML = ''; }
+  function setMode(m) { mode = m; $('mSize').className = m === 'size' ? 'on' : ''; $('mFoot').className = m === 'foot' ? 'on' : ''; $('rSize').style.display = m === 'size' ? 'flex' : 'none'; $('rFoot').style.display = m === 'foot' ? 'flex' : 'none'; render(); }
+  $('mSize').onclick = function () { setMode('size'); }; $('mFoot').onclick = function () { setMode('foot'); };
+  ['sys', 'size', 'cm'].forEach(function (i) { $(i).oninput = render; });
+  $('sys').onchange = render;
+  render();
+})();
+</script>
+</body>
+</html>
